@@ -2,7 +2,7 @@
 # Subscribe YouTube Channel For Amazing Bot @Tech_VJ
 # Ask Doubt on telegram @KingVJ01
 
-
+import os
 import re
 from os import environ
 from Script import script 
@@ -30,6 +30,9 @@ LOG_CHANNEL = int(environ.get('LOG_CHANNEL', ''))
 
 # This Is File Channel Where You Upload Your File Then Bot Automatically Save It In Database 
 CHANNELS = [int(ch) if id_pattern.search(ch) else ch for ch in environ.get('CHANNELS', '').split()]  # For Multiple Id Use One Space Between Each.
+
+TARGET_CHANNEL = int(os.environ.get("TARGET_CHANNEL", "0"))
+
 
 # auth_channel means force subscribe channel.
 # if REQUEST_TO_JOIN_MODE is true then force subscribe work like request to join fsub, else if false then work like normal fsub.
@@ -197,13 +200,9 @@ else:
 # Subscribe YouTube Channel For Amazing Bot @Tech_VJ
 # Ask Doubt on telegram @KingVJ01
 
-import os  # <--- ADD THIS LINE AT THE VERY TOP
-import re
-from os import environ
-
 # ... rest of the code ...
 
 # Your new code at the bottom:
-TARGET_CHANNEL = int(os.environ.get("TARGET_CHANNEL", "0"))
+
 
 
