@@ -5,19 +5,19 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from info import ADMINS, TARGET_CHANNEL, DATABASE_URI, DATABASE_NAME
 import traceback
 
-print("🔴 push_files.py: Starting to load...")
+print("Starting push_files.py loading...")
 
 # Database Connection
 try:
     db_client = AsyncIOMotorClient(DATABASE_URI)
     db = db_client[DATABASE_NAME]
     collection = db['Files'] 
-    print("✅ Database connected successfully in push_files.py")
+    print("SUCCESS: Database connected in push_files.py")
 except Exception as e:
-    print(f"❌ Database Connection Error: {e}")
+    print(f"ERROR: Database Connection Error: {e}")
     traceback.print_exc()
 
-print(f"✅ Imports successful!")
+print("SUCCESS: Imports successful!")
 print(f"   ADMINS: {ADMINS}")
 print(f"   TARGET_CHANNEL: {TARGET_CHANNEL}")
 print(f"   TARGET_CHANNEL type: {type(TARGET_CHANNEL)}")
@@ -28,7 +28,7 @@ print(f"   TARGET_CHANNEL type: {type(TARGET_CHANNEL)}")
 @Client.on_message(filters.command("checkenv") & filters.private)
 async def check_environment(client, message):
     """Check if environment variables are loaded correctly"""
-    print(f"🔵 /checkenv command from user {message.from_user.id}")
+    print(f"[checkenv] Command from user {message.from_user.id}")
     
     await message.reply_text(
         f"🔍 **Environment Check:**\n\n"
@@ -49,7 +49,7 @@ async def push_to_channel(client: Client, message: Message):
     """Push all unpushed files from database to target channel"""
     
     print("=" * 70)
-    print("🔴 /PUSHALL COMMAND TRIGGERED!")
+    print("[PUSHALL] COMMAND TRIGGERED!")
     print(f"   User ID: {message.from_user.id}")
     print(f"   User Name: {message.from_user.first_name}")
     print(f"   Chat ID: {message.chat.id}")
@@ -60,16 +60,16 @@ async def push_to_channel(client: Client, message: Message):
     # Send immediate response
     try:
         status_msg = await message.reply_text("🔄 **Processing your request...**")
-        print("✅ Bot can send messages")
+        print("SUCCESS: Bot can send messages")
     except Exception as e:
-        print(f"❌ Cannot send message: {e}")
+        print(f"ERROR: Cannot send message: {e}")
         traceback.print_exc()
         return
     
     # Admin Check
     user_id = message.from_user.id
     if user_id not in ADMINS:
-        print(f"❌ Access denied for user {user_id}")
+        print(f"ERROR: Access denied for user {user_id}")
         await status_msg.edit_text(
             f"❌ **Access Denied!**\n\n"
             f"👤 **Your User ID:** `{user_id}`\n"
@@ -82,14 +82,14 @@ async def push_to_channel(client: Client, message: Message):
         )
         return
     
-    print(f"✅ Admin verified: {user_id}")
+    print(f"SUCCESS: Admin verified: {user_id}")
     await status_msg.edit_text("✅ **Admin verified!**\n🔄 Checking configuration...")
     
     # Configuration Check
     print(f"   TARGET_CHANNEL: {TARGET_CHANNEL} (type: {type(TARGET_CHANNEL)})")
     
     if not TARGET_CHANNEL or TARGET_CHANNEL == 0:
-        print("❌ TARGET_CHANNEL not configured")
+        print("ERROR: TARGET_CHANNEL not configured")
         await status_msg.edit_text(
             "❌ **Configuration Error!**\n\n"
             "`TARGET_CHANNEL` is not set in environment variables.\n\n"
@@ -100,7 +100,7 @@ async def push_to_channel(client: Client, message: Message):
         )
         return
     
-    print("✅ Configuration check passed")
+    print("SUCCESS: Configuration check passed")
     await status_msg.edit_text(
         f"✅ **Configuration OK!**\n\n"
         f"📡 **Target Channel:** `{TARGET_CHANNEL}`\n"
@@ -109,12 +109,12 @@ async def push_to_channel(client: Client, message: Message):
     
     # Database Query
     try:
-        print("🔍 Querying database for unpushed files...")
+        print("Querying database for unpushed files...")
         query = {"pushed_to_channel": {"$ne": True}}
         total_files = await collection.count_documents(query)
-        print(f"📊 Found {total_files} files to push")
+        print(f"Found {total_files} files to push")
     except Exception as e:
-        print(f"❌ Database query error: {e}")
+        print(f"ERROR: Database query error: {e}")
         traceback.print_exc()
         await status_msg.edit_text(
             f"❌ **Database Error!**\n\n"
@@ -124,7 +124,7 @@ async def push_to_channel(client: Client, message: Message):
         return
     
     if total_files == 0:
-        print("⚠️ No new files found to push")
+        print("WARNING: No new files found to push")
         await status_msg.edit_text(
             "✅ **All Files Synced!**\n\n"
             "No new files found in database.\n"
@@ -147,7 +147,7 @@ async def push_to_channel(client: Client, message: Message):
     skipped_count = 0
     last_update = 0
     
-    print(f"🚀 Starting to push {total_files} files...")
+    print(f"Starting to push {total_files} files...")
     print("-" * 70)
     
     # Process each file
@@ -158,11 +158,11 @@ async def push_to_channel(client: Client, message: Message):
             caption = file_doc.get('caption') or file_doc.get('file_name', '')
             
             if not file_id:
-                print(f"⚠️ Skipped - No file_id for: {caption[:50]}")
+                print(f"WARNING: Skipped - No file_id for: {caption[:50]}")
                 skipped_count += 1
                 continue
             
-            print(f"📤 Sending: {caption[:60]}... ({file_type})")
+            print(f"Sending: {caption[:60]}... ({file_type})")
             
             # Send file based on type
             try:
@@ -215,7 +215,7 @@ async def push_to_channel(client: Client, message: Message):
                 )
                 
                 sent_count += 1
-                print(f"   ✅ Sent successfully ({sent_count}/{total_files})")
+                print(f"   SUCCESS: Sent successfully ({sent_count}/{total_files})")
                 
                 # Update status message every 10 files
                 if sent_count - last_update >= 10:
@@ -232,12 +232,12 @@ async def push_to_channel(client: Client, message: Message):
                         pass  # Ignore message edit errors
                 
             except errors.FloodWait as e:
-                print(f"⚠️ FloodWait: Sleeping for {e.value} seconds")
+                print(f"WARNING: FloodWait - Sleeping for {e.value} seconds")
                 await asyncio.sleep(e.value + 5)
                 continue
                 
             except Exception as send_error:
-                print(f"   ❌ Send error: {send_error}")
+                print(f"   ERROR: Send error: {send_error}")
                 error_count += 1
                 continue
             
@@ -245,14 +245,14 @@ async def push_to_channel(client: Client, message: Message):
             await asyncio.sleep(3)
             
         except Exception as e:
-            print(f"❌ Error processing file: {e}")
+            print(f"ERROR: Error processing file: {e}")
             traceback.print_exc()
             error_count += 1
             continue
     
     # Final summary
     print("=" * 70)
-    print(f"✅ PUSH COMPLETE!")
+    print("PUSH COMPLETE!")
     print(f"   Sent: {sent_count}")
     print(f"   Errors: {error_count}")
     print(f"   Skipped: {skipped_count}")
@@ -275,11 +275,11 @@ async def push_to_channel(client: Client, message: Message):
 async def reset_push_status(client: Client, message: Message):
     """Reset pushed_to_channel flag for all files"""
     
-    print(f"🔴 /resetpush command from user {message.from_user.id}")
+    print(f"[resetpush] Command from user {message.from_user.id}")
     
     # Admin check
     if message.from_user.id not in ADMINS:
-        print(f"❌ Access denied for user {message.from_user.id}")
+        print(f"ERROR: Access denied for user {message.from_user.id}")
         await message.reply_text("❌ **Access Denied!** You are not authorized to use this command.")
         return
     
@@ -292,7 +292,7 @@ async def reset_push_status(client: Client, message: Message):
             {"$unset": {"pushed_to_channel": ""}}
         )
         
-        print(f"✅ Reset complete - Modified {result.modified_count} documents")
+        print(f"SUCCESS: Reset complete - Modified {result.modified_count} documents")
         
         await processing_msg.edit_text(
             f"✅ **Reset Complete!**\n\n"
@@ -300,7 +300,7 @@ async def reset_push_status(client: Client, message: Message):
             f"You can now use `/pushall` to push all files again."
         )
     except Exception as e:
-        print(f"❌ Reset error: {e}")
+        print(f"ERROR: Reset error: {e}")
         traceback.print_exc()
         await processing_msg.edit_text(f"❌ **Error:** `{str(e)[:100]}`")
 
@@ -311,7 +311,7 @@ async def reset_push_status(client: Client, message: Message):
 async def push_status(client: Client, message: Message):
     """Check push status statistics"""
     
-    print(f"🔵 /pushstatus command from user {message.from_user.id}")
+    print(f"[pushstatus] Command from user {message.from_user.id}")
     
     if message.from_user.id not in ADMINS:
         return
@@ -329,56 +329,43 @@ async def push_status(client: Client, message: Message):
             f"💡 Use `/pushall` to push pending files."
         )
     except Exception as e:
-        print(f"❌ Status check error: {e}")
+        print(f"ERROR: Status check error: {e}")
         await message.reply_text(f"❌ **Error:** `{str(e)[:100]}`")
 
 # Plugin loaded confirmation
-print("✅ push_files.py loaded successfully!")
-print(f"   Registered commands: /pushall, /resetpush, /pushstatus, /checkenv")
+print("=" * 70)
+print("SUCCESS: push_files.py loaded successfully!")
+print("   Registered commands:")
+print("   - /pushall (Push all files to channel)")
+print("   - /resetpush (Reset push status)")
+print("   - /pushstatus (Check pending files)")
+print("   - /checkenv (Check environment variables)")
 print(f"   ADMINS: {ADMINS}")
 print(f"   TARGET_CHANNEL: {TARGET_CHANNEL}")
+print("=" * 70)
 ```
 
-## Now do these steps:
+## Key Changes Made:
 
-### 1. Replace the file
-- Replace your entire `plugins/push_files.py` with the code above
+1. ✅ **Removed all emojis from print statements** - replaced with text like "SUCCESS:", "ERROR:", "WARNING:"
+2. ✅ **Kept emojis ONLY inside f-strings and quotes** where they're safe
+3. ✅ **Added proper separators** with `"=" * 70` for better log readability
+4. ✅ **All print statements are now plain ASCII**
 
-### 2. Save and restart the bot
-- Save the file
-- **Completely stop and restart your bot** (not just redeploy)
+## Now:
 
-### 3. Test commands in this order:
-
-**First, get your user ID:**
-```
-/checkenv
-```
-
-**Check how many files need pushing:**
-```
-/pushstatus
-```
-
-**Push all files:**
-```
-/pushall
-```
-
-### 4. What to look for in logs:
-
-When you start the bot, you should see:
-```
-✅ push_files.py loaded successfully!
-   Registered commands: /pushall, /resetpush, /pushstatus, /checkenv
-   ADMINS: [915392007]
-   TARGET_CHANNEL: -1003641067210
-```
-
-When you send `/pushall`, you should see:
+1. **Replace your `plugins/push_files.py`** with this corrected code
+2. **Save the file**
+3. **Restart your bot completely**
+4. **Check the logs** - you should see:
 ```
 ======================================================================
-🔴 /PUSHALL COMMAND TRIGGERED!
-   User ID: [your ID]
-   ...
+SUCCESS: push_files.py loaded successfully!
+   Registered commands:
+   - /pushall (Push all files to channel)
+   - /resetpush (Reset push status)
+   - /pushstatus (Check pending files)
+   - /checkenv (Check environment variables)
+   ADMINS: [915392007]
+   TARGET_CHANNEL: -1003641067210
 ======================================================================
