@@ -12,10 +12,9 @@ except Exception as e:
     print(f"❌ Database Connection Error: {e}")
 
 # -------------------------------------------------------------------------------------
-# COMMAND: /pushall (DEBUG VERSION)
+# COMMAND: /pushall (FIXED VERSION)
 # -------------------------------------------------------------------------------------
 
-# REMOVED "filters.user(ADMINS)" to allow the bot to reply with an error
 @Client.on_message(filters.command("pushall"))
 async def push_to_channel(client, message):
     
@@ -59,6 +58,7 @@ async def push_to_channel(client, message):
     async for file_doc in collection.find(query):
         try:
             file_id = file_doc.get('file_id')
+            file_type = file_doc.get('file_type', 'document')  # Get file type
             caption = file_doc.get('caption', None)
             
             if not caption:
@@ -68,23 +68,72 @@ async def push_to_channel(client, message):
                 skipped_count += 1
                 continue
 
-            # Send File
-            await client.send_cached_media(
-                chat_id=TARGET_CHANNEL,
-                file_id=file_id,
-                caption=caption
-            )
+            # Send File Based on Type (FIXED: Use correct Pyrogram methods)
+            try:
+                if file_type == 'video':
+                    await client.send_video(
+                        chat_id=TARGET_CHANNEL,
+                        video=file_id,
+                        caption=caption
+                    )
+                elif file_type == 'audio':
+                    await client.send_audio(
+                        chat_id=TARGET_CHANNEL,
+                        audio=file_id,
+                        caption=caption
+                    )
+                elif file_type == 'photo':
+                    await client.send_photo(
+                        chat_id=TARGET_CHANNEL,
+                        photo=file_id,
+                        caption=caption
+                    )
+                elif file_type == 'voice':
+                    await client.send_voice(
+                        chat_id=TARGET_CHANNEL,
+                        voice=file_id,
+                        caption=caption
+                    )
+                elif file_type == 'video_note':
+                    await client.send_video_note(
+                        chat_id=TARGET_CHANNEL,
+                        video_note=file_id
+                    )
+                elif file_type == 'animation':
+                    await client.send_animation(
+                        chat_id=TARGET_CHANNEL,
+                        animation=file_id,
+                        caption=caption
+                    )
+                else:  # Default to document
+                    await client.send_document(
+                        chat_id=TARGET_CHANNEL,
+                        document=file_id,
+                        caption=caption
+                    )
 
-            # Mark as Sent in Database
-            await collection.update_one(
-                {'_id': file_doc['_id']},
-                {'$set': {'pushed_to_channel': True}}
-            )
+                # Mark as Sent in Database
+                await collection.update_one(
+                    {'_id': file_doc['_id']},
+                    {'$set': {'pushed_to_channel': True}}
+                )
 
-            sent_count += 1
-            
-            if sent_count % 50 == 0:
-                await status_msg.edit(f"🔄 **Syncing Files...**\n✅ Sent: {sent_count}\n📂 Total New: {total_files}")
+                sent_count += 1
+                
+                if sent_count % 50 == 0:
+                    await status_msg.edit(
+                        f"🔄 **Syncing Files...**\n"
+                        f"✅ Sent: {sent_count}\n"
+                        f"❌ Errors: {error_count}\n"
+                        f"⏭️ Skipped: {skipped_count}\n"
+                        f"📂 Total New: {total_files}"
+                    )
+
+            except Exception as send_error:
+                print(f"❌ Error sending file {file_id}: {send_error}")
+                error_count += 1
+                # Don't mark as pushed if sending failed
+                continue
 
             await asyncio.sleep(3) 
 
@@ -92,10 +141,17 @@ async def push_to_channel(client, message):
             print(f"⚠️ FloodWait: Sleeping for {e.value} seconds")
             await asyncio.sleep(e.value + 5)
         except Exception as e:
-            print(f"❌ Error sending file: {e}")
+            print(f"❌ Error processing file: {e}")
             error_count += 1
 
-    await status_msg.edit(f"✅ **Sync Complete!**\nSent: `{sent_count}`")
+    # Final Summary
+    await status_msg.edit(
+        f"✅ **Sync Complete!**\n\n"
+        f"📤 **Sent:** `{sent_count}`\n"
+        f"❌ **Errors:** `{error_count}`\n"
+        f"⏭️ **Skipped:** `{skipped_count}`\n"
+        f"📊 **Total Processed:** `{total_files}`"
+    )
 
 # -------------------------------------------------------------------------------------
 # COMMAND: /resetpush
@@ -106,5 +162,12 @@ async def reset_push_status(client, message):
         return # Silent ignore for safety
         
     processing_msg = await message.reply_text("🔄 **Resetting Database Status...**")
-    result = await collection.update_many({"pushed_to_channel": True}, {"$unset": {"pushed_to_channel": ""}})
-    await processing_msg.edit(f"✅ **Reset Complete!**\nHistory cleared for **{result.modified_count}** files.")
+    result = await collection.update_many(
+        {"pushed_to_channel": True}, 
+        {"$unset": {"pushed_to_channel": ""}}
+    )
+    await processing_msg.edit(
+        f"✅ **Reset Complete!**\n"
+        f"History cleared for **{result.modified_count}** files.\n\n"
+        f"You can now run `/pushall` again to resend all files."
+    )
