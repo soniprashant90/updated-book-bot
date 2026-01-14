@@ -3,33 +3,41 @@ from pyrogram import Client, filters, errors
 from motor.motor_asyncio import AsyncIOMotorClient
 from info import ADMINS, TARGET_CHANNEL, DATABASE_URI, DATABASE_NAME
 
-# -------------------------------------------------------------------------------------
-# DIRECT DATABASE CONNECTION
-# We connect directly to MongoDB to avoid ImportError issues with ia_filterdb.py
-# -------------------------------------------------------------------------------------
+# Database Connection
 try:
     db_client = AsyncIOMotorClient(DATABASE_URI)
     db = db_client[DATABASE_NAME]
-    # 'Files' is the standard collection name for VJ-Filter-Bot
     collection = db['Files'] 
 except Exception as e:
     print(f"❌ Database Connection Error: {e}")
 
 # -------------------------------------------------------------------------------------
-# COMMAND: /pushall
+# COMMAND: /pushall (DEBUG VERSION)
 # -------------------------------------------------------------------------------------
 
-@Client.on_message(filters.command("pushall") & filters.user(ADMINS))
+# REMOVED "filters.user(ADMINS)" to allow the bot to reply with an error
+@Client.on_message(filters.command("pushall"))
 async def push_to_channel(client, message):
     
-    # 1. Configuration Check
+    # 1. DEBUG CHECK: Are you an Admin?
+    user_id = message.from_user.id
+    if user_id not in ADMINS:
+        await message.reply_text(
+            f"❌ **Access Denied**\n\n"
+            f"👤 **Your ID:** `{user_id}`\n"
+            f"🔑 **Allowed Admins:** `{ADMINS}`\n\n"
+            f"⚠️ *Please copy your ID and add it to the ADMINS variable in your settings.*"
+        )
+        return
+
+    # 2. Configuration Check
     if not TARGET_CHANNEL or TARGET_CHANNEL == 0:
         await message.reply_text("❌ **Configuration Error:**\n`TARGET_CHANNEL` ID is missing in your settings (Env Variables).")
         return
 
     status_msg = await message.reply_text(f"🔄 **Connecting to Database...**\nTarget Channel: `{TARGET_CHANNEL}`")
     
-    # 2. Find files that do NOT have the 'pushed_to_channel' flag
+    # 3. Find files that do NOT have the 'pushed_to_channel' flag
     try:
         query = {"pushed_to_channel": {"$ne": True}}
         total_files = await collection.count_documents(query)
@@ -47,13 +55,12 @@ async def push_to_channel(client, message):
     error_count = 0
     skipped_count = 0
 
-    # 3. Start Loop
+    # 4. Start Loop
     async for file_doc in collection.find(query):
         try:
             file_id = file_doc.get('file_id')
             caption = file_doc.get('caption', None)
             
-            # Use filename if caption is missing
             if not caption:
                 caption = file_doc.get('file_name', '')
 
@@ -76,16 +83,9 @@ async def push_to_channel(client, message):
 
             sent_count += 1
             
-            # Update Status every 50 files
             if sent_count % 50 == 0:
-                await status_msg.edit(
-                    f"🔄 **Syncing Files...**\n"
-                    f"✅ Sent: {sent_count}\n"
-                    f"📂 Total New: {total_files}\n"
-                    f"❌ Errors: {error_count}"
-                )
+                await status_msg.edit(f"🔄 **Syncing Files...**\n✅ Sent: {sent_count}\n📂 Total New: {total_files}")
 
-            # Sleep to prevent FloodWait
             await asyncio.sleep(3) 
 
         except errors.FloodWait as e:
@@ -95,31 +95,16 @@ async def push_to_channel(client, message):
             print(f"❌ Error sending file: {e}")
             error_count += 1
 
-    # Final Report
-    await status_msg.edit(
-        f"✅ **Sync Complete!**\n\n"
-        f"📤 Successfully Sent: `{sent_count}`\n"
-        f"❌ Failed: `{error_count}`\n"
-        f"⏩ Skipped: `{skipped_count}`"
-    )
-
+    await status_msg.edit(f"✅ **Sync Complete!**\nSent: `{sent_count}`")
 
 # -------------------------------------------------------------------------------------
 # COMMAND: /resetpush
 # -------------------------------------------------------------------------------------
-
-@Client.on_message(filters.command("resetpush") & filters.user(ADMINS))
+@Client.on_message(filters.command("resetpush"))
 async def reset_push_status(client, message):
-    
+    if message.from_user.id not in ADMINS:
+        return # Silent ignore for safety
+        
     processing_msg = await message.reply_text("🔄 **Resetting Database Status...**")
-    
-    # Remove the 'pushed_to_channel' field from all documents
-    result = await collection.update_many(
-        {"pushed_to_channel": True}, 
-        {"$unset": {"pushed_to_channel": ""}}
-    )
-    
-    if result.modified_count == 0:
-        await processing_msg.edit("⚠️ **Nothing to reset.**\nNo files are marked as sent.")
-    else:
-        await processing_msg.edit(f"✅ **Reset Complete!**\n\nForgetting history for **{result.modified_count}** files.")
+    result = await collection.update_many({"pushed_to_channel": True}, {"$unset": {"pushed_to_channel": ""}})
+    await processing_msg.edit(f"✅ **Reset Complete!**\nHistory cleared for **{result.modified_count}** files.")
