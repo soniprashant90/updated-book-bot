@@ -197,10 +197,13 @@ else:
 # Subscribe YouTube Channel For Amazing Bot @Tech_VJ
 # Ask Doubt on telegram @KingVJ01
 
-# =========================================================
-#  NEW CONFIGURATION FOR PUSH FEATURE
-# =========================================================
-# Reads the Target Channel ID. Defaults to 0 if not found.
+import os  # <--- ADD THIS LINE AT THE VERY TOP
+import re
+from os import environ
+
+# ... rest of the code ...
+
+# Your new code at the bottom:
 TARGET_CHANNEL = int(os.environ.get("TARGET_CHANNEL", "0"))
 
 
