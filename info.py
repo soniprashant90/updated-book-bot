@@ -31,7 +31,7 @@ LOG_CHANNEL = int(environ.get('LOG_CHANNEL', ''))
 # This Is File Channel Where You Upload Your File Then Bot Automatically Save It In Database 
 CHANNELS = [int(ch) if id_pattern.search(ch) else ch for ch in environ.get('CHANNELS', '').split()]  # For Multiple Id Use One Space Between Each.
 
-TARGET_CHANNEL = int(os.environ.get("TARGET_CHANNEL", "0"))
+TARGET_CHANNEL = int(environ.get("TARGET_CHANNEL", "0"))
 
 
 # auth_channel means force subscribe channel.
@@ -203,6 +203,7 @@ else:
 # ... rest of the code ...
 
 # Your new code at the bottom:
+
 
 
 
