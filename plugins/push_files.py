@@ -22,21 +22,32 @@ print(f"   ADMINS: {ADMINS}")
 print(f"   TARGET_CHANNEL: {TARGET_CHANNEL}")
 print(f"   TARGET_CHANNEL type: {type(TARGET_CHANNEL)}")
 
-# COMMAND: /checkenv
+# COMMAND: /checkenv - WORKS FOR EVERYONE (for testing)
 @Client.on_message(filters.command("checkenv") & filters.private)
 async def check_environment(client, message):
     print(f"[checkenv] Command from user {message.from_user.id}")
+    print(f"[checkenv] User name: {message.from_user.first_name}")
     
-    await message.reply_text(
-        f"Environment Check:\n\n"
-        f"Your User ID: {message.from_user.id}\n"
-        f"ADMINS List: {ADMINS}\n"
-        f"Is Admin? {message.from_user.id in ADMINS}\n\n"
-        f"TARGET_CHANNEL: {TARGET_CHANNEL}\n"
-        f"DATABASE_NAME: {DATABASE_NAME}\n"
-        f"DATABASE_URI: {DATABASE_URI[:30]}...\n\n"
-        f"If your ID is not in ADMINS list, add it to environment variables."
-    )
+    try:
+        await message.reply_text(
+            f"Environment Check:\n\n"
+            f"Your User ID: {message.from_user.id}\n"
+            f"Your Name: {message.from_user.first_name}\n"
+            f"ADMINS List: {ADMINS}\n"
+            f"Is Admin? {message.from_user.id in ADMINS}\n\n"
+            f"TARGET_CHANNEL: {TARGET_CHANNEL}\n"
+            f"DATABASE_NAME: {DATABASE_NAME}\n"
+        )
+        print("[checkenv] Response sent successfully")
+    except Exception as e:
+        print(f"[checkenv] ERROR: {e}")
+        traceback.print_exc()
+
+# COMMAND: /test - Simple test command
+@Client.on_message(filters.command("test") & filters.private)
+async def test_command(client, message):
+    print(f"[test] Command received from {message.from_user.id}")
+    await message.reply_text(f"Bot is working!\nYour ID: {message.from_user.id}")
 
 # COMMAND: /pushall
 @Client.on_message(filters.command("pushall") & filters.private)
@@ -69,8 +80,7 @@ async def push_to_channel(client: Client, message: Message):
             f"Action Required:\n"
             f"1. Copy your User ID: {user_id}\n"
             f"2. Add it to ADMINS environment variable\n"
-            f"3. Restart the bot\n\n"
-            f"Use @userinfobot to verify your ID"
+            f"3. Restart the bot"
         )
         return
     
@@ -83,11 +93,7 @@ async def push_to_channel(client: Client, message: Message):
         print("ERROR: TARGET_CHANNEL not configured")
         await status_msg.edit_text(
             "Configuration Error!\n\n"
-            "TARGET_CHANNEL is not set in environment variables.\n\n"
-            "Setup Instructions:\n"
-            "1. Get your channel ID (use @userinfobot)\n"
-            "2. Set TARGET_CHANNEL in environment variables\n"
-            "3. Restart the bot"
+            "TARGET_CHANNEL is not set in environment variables."
         )
         return
     
@@ -118,7 +124,7 @@ async def push_to_channel(client: Client, message: Message):
         await status_msg.edit_text(
             "All Files Synced!\n\n"
             "No new files found in database.\n"
-            "All existing files have already been pushed to the channel.\n\n"
+            "All existing files have already been pushed.\n\n"
             "Use /resetpush to clear history and push again."
         )
         return
@@ -247,8 +253,7 @@ async def push_to_channel(client: Client, message: Message):
         f"Successfully Sent: {sent_count}\n"
         f"Errors: {error_count}\n"
         f"Skipped: {skipped_count}\n"
-        f"Total Processed: {total_files}\n\n"
-        f"All files have been pushed to the channel!"
+        f"Total Processed: {total_files}"
     )
 
 # COMMAND: /resetpush
@@ -259,7 +264,7 @@ async def reset_push_status(client: Client, message: Message):
     
     if message.from_user.id not in ADMINS:
         print(f"ERROR: Access denied for user {message.from_user.id}")
-        await message.reply_text("Access Denied! You are not authorized to use this command.")
+        await message.reply_text("Access Denied! You are not authorized.")
         return
     
     processing_msg = await message.reply_text("Resetting push status...")
@@ -309,7 +314,20 @@ async def push_status(client: Client, message: Message):
 
 print("=" * 70)
 print("SUCCESS: push_files.py loaded successfully!")
-print("   Commands: /pushall, /resetpush, /pushstatus, /checkenv")
+print("   Commands: /pushall, /resetpush, /pushstatus, /checkenv, /test")
 print(f"   ADMINS: {ADMINS}")
 print(f"   TARGET_CHANNEL: {TARGET_CHANNEL}")
 print("=" * 70)
+```
+
+## Step 4: After restarting, test these commands:
+
+1. `/test` - Should always work
+2. `/checkenv` - Should show your info
+3. `/start` - Check if this works
+
+## Step 5: Watch the logs
+
+When you send `/test` or `/checkenv`, you should see in the logs:
+```
+[test] Command received from [your ID]
