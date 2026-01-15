@@ -31,8 +31,7 @@ LOG_CHANNEL = int(environ.get('LOG_CHANNEL', ''))
 # This Is File Channel Where You Upload Your File Then Bot Automatically Save It In Database 
 CHANNELS = [int(ch) if id_pattern.search(ch) else ch for ch in environ.get('CHANNELS', '').split()]  # For Multiple Id Use One Space Between Each.
 
-# Export indexed files to private channel
-EXPORT_CHANNEL_ID = int(environ.get("EXPORT_CHANNEL_ID", "0"))
+
 
 
 
@@ -205,6 +204,7 @@ else:
 # ... rest of the code ...
 
 # Your new code at the bottom:
+
 
 
 
