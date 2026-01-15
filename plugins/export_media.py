@@ -2,7 +2,7 @@ import asyncio
 from pyrogram import Client, filters
 from pyrogram.errors import FloodWait
 
-from config import EXPORT_CHANNEL_ID
+from info import EXPORT_CHANNEL_ID
 from database import media_db, export_db
 from utils import admin_filter   # already used in your bot
 
