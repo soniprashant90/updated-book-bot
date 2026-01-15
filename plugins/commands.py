@@ -1464,4 +1464,153 @@ async def purge_requests(client, message):
             disable_web_page_preview=True
         )
 
+# ====================================================================
+#  SMART EXPORT FEATURE
+# ====================================================================
+
+# Global dictionary to track export status in memory
+EXPORT_STATUS = {
+    'running': False,
+    'stop': False
+}
+
+def get_checkpoint(key):
+    """Get the last processed file ID from the database."""
+    try:
+        doc = files_db_sync.export_checkpoint.find_one({'_id': key})
+        return doc['last_id'] if doc else None
+    except:
+        return None
+
+def update_checkpoint(key, last_id):
+    """Save the current file ID as the checkpoint."""
+    try:
+        files_db_sync.export_checkpoint.update_one(
+            {'_id': key},
+            {'$set': {'last_id': last_id}},
+            upsert=True
+        )
+    except:
+        pass
+
+def clear_checkpoints():
+    """Delete all checkpoints to restart export from zero."""
+    try:
+        files_db_sync.export_checkpoint.delete_many({})
+    except:
+        pass
+
+@Client.on_message(filters.command("export_all") & filters.user(ADMINS))
+async def export_all_files(client, message):
+    if not EXPORT_CHANNEL_ID:
+        return await message.reply("<b>⚠️ EXPORT_CHANNEL_ID is not set in info.py!</b>")
+    
+    if EXPORT_STATUS['running']:
+        return await message.reply("<b>⚠️ Export is already running! Use /stop_export to pause it.</b>")
+
+    EXPORT_STATUS['running'] = True
+    EXPORT_STATUS['stop'] = False
+    
+    status_msg = await message.reply("<b>🔄 Checking database for new files...</b>")
+    
+    total_sent = 0
+    # Process primary DB, then secondary if enabled
+    collections_to_process = [{'cursor_col': col, 'key': 'primary'}]
+    if MULTIPLE_DATABASE:
+        collections_to_process.append({'cursor_col': sec_col, 'key': 'secondary'})
+
+    try:
+        for item in collections_to_process:
+            if EXPORT_STATUS['stop']: break
+            
+            cursor_col = item['cursor_col']
+            key = item['key']
+            
+            # 1. Fetch where we left off (Checkpoint)
+            last_id = get_checkpoint(key)
+            
+            # 2. Query ONLY files newer than the checkpoint (Smart Filter)
+            query = {'_id': {'$gt': last_id}} if last_id else {}
+            
+            # 3. Sort by ID to ensure correct order
+            cursor = cursor_col.find(query).sort('_id', 1)
+            
+            for file in cursor:
+                if EXPORT_STATUS['stop']: 
+                    break
+                
+                file_id = file.get('file_id')
+                caption = file.get('caption', '')
+                current_id = file.get('_id')
+                
+                if not file_id:
+                    continue
+                    
+                try:
+                    # Send the file
+                    await client.send_cached_media(
+                        chat_id=EXPORT_CHANNEL_ID,
+                        file_id=file_id,
+                        caption=caption
+                    )
+                    
+                    # Update progress IMMEDIATELY in Database
+                    update_checkpoint(key, current_id)
+                    total_sent += 1
+                    
+                except FloodWait as e:
+                    await asyncio.sleep(e.value)
+                    try:
+                        if EXPORT_STATUS['stop']: break
+                        await client.send_cached_media(
+                            chat_id=EXPORT_CHANNEL_ID,
+                            file_id=file_id,
+                            caption=caption
+                        )
+                        update_checkpoint(key, current_id)
+                        total_sent += 1
+                    except Exception:
+                        pass
+                except Exception as e:
+                    # Even if it fails, mark as processed to avoid infinite loop on bad files
+                    update_checkpoint(key, current_id)
+                    print(f"Export Error: {e}")
+                    continue
+                
+                # Update status message every 20 files
+                if total_sent % 20 == 0:
+                    try:
+                        await status_msg.edit(f"<b>📤 Exporting New Files...\n\nFiles Sent This Session: {total_sent}</b>")
+                    except:
+                        pass
+
+        if EXPORT_STATUS['stop']:
+             await status_msg.edit(f"<b>🛑 Export Paused.\n\n✅ Sent {total_sent} new files.\nRun /export_all to resume.</b>")
+        else:
+             if total_sent == 0:
+                 await status_msg.edit("<b>✅ Database is up to date! No new files to export.</b>")
+             else:
+                 await status_msg.edit(f"<b>✅ Export Complete!\n\n📤 Total New Files Sent: {total_sent}</b>")
+             
+    except Exception as e:
+        await status_msg.edit(f"<b>❌ Error: {e}</b>")
+    finally:
+        EXPORT_STATUS['running'] = False
+
+
+@Client.on_message(filters.command("stop_export") & filters.user(ADMINS))
+async def stop_export_command(client, message):
+    if not EXPORT_STATUS['running']:
+        return await message.reply("<b>ℹ️ No export is running.</b>")
+    
+    EXPORT_STATUS['stop'] = True
+    await message.reply("<b>🛑 Stopping... Bot will finish the current file and pause.</b>")
+
+
+@Client.on_message(filters.command("reset_export") & filters.user(ADMINS))
+async def reset_export_command(client, message):
+    # This stops the process AND deletes the history
+    EXPORT_STATUS['stop'] = True
+    clear_checkpoints()
+    await message.reply("<b>🗑️ Export Memory Wiped!\n\nThe next time you run /export_all, it will start from the very beginning (sending ALL files).</b>")
 
